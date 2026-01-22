@@ -2,8 +2,10 @@
 # init.sh - 首次配置引导
 # 使用方法: ./init.sh
 
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-source "$SCRIPT_DIR/auth.sh"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# 仅在未加载时加载依赖
+[[ -z "$ALIYUN_PLUGIN_DIR" ]] && source "$SCRIPT_DIR/auth.sh"
 
 CONFIG_FILE="$ALIYUN_PLUGIN_DIR/config.yaml"
 

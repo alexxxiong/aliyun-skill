@@ -67,7 +67,8 @@ load_from_cli_config() {
     local access_key_secret=$(jq -r --arg p "$profile" '.profiles[] | select(.name == $p) | .access_key_secret // empty' "$config_file" 2>/dev/null)
     local region_id=$(jq -r --arg p "$profile" '.profiles[] | select(.name == $p) | .region_id // empty' "$config_file" 2>/dev/null)
 
-    if [[ -n "$access_key_id" && -n "$access_key_secret" ]]; then
+    # 检查密钥是否是掩码值（以 * 开头表示被隐藏）
+    if [[ -n "$access_key_id" && -n "$access_key_secret" && ! "$access_key_secret" =~ ^\*+ ]]; then
         export ALIBABA_CLOUD_ACCESS_KEY_ID="$access_key_id"
         export ALIBABA_CLOUD_ACCESS_KEY_SECRET="$access_key_secret"
         [[ -n "$region_id" ]] && export ALIBABA_CLOUD_REGION_ID="$region_id"
