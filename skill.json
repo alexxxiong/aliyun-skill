@@ -1,0 +1,60 @@
+{
+  "name": "aliyun-skill",
+  "version": "1.0.0",
+  "description": "Claude Code Skill for Alibaba Cloud (Aliyun) resource management",
+  "description_zh": "阿里云资源管理 Skill - 支持 ECS、OSS、DNS、RDS 等服务的查询和操作",
+  "author": "alexxxiong",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/alexxxiong/aliyun-skill.git"
+  },
+  "keywords": [
+    "claude-code",
+    "claude-skill",
+    "aliyun",
+    "alibaba-cloud",
+    "ecs",
+    "oss",
+    "dns",
+    "rds",
+    "ack",
+    "slb",
+    "cloud-management"
+  ],
+  "commands": [
+    {
+      "name": "aliyun",
+      "description": "Alibaba Cloud resource management",
+      "file": "commands/aliyun.md"
+    }
+  ],
+  "dependencies": {
+    "cli": ["aliyun-cli", "jq", "yq"],
+    "optional": ["python3"]
+  },
+  "install": {
+    "script": "install.sh",
+    "uninstall": "uninstall.sh"
+  },
+  "features": [
+    "ECS - Cloud server instance management",
+    "OSS - Object storage file operations",
+    "DNS - Domain name resolution management",
+    "RDS - Database instance queries",
+    "ACK - Kubernetes cluster management",
+    "ACR - Container registry queries",
+    "SLB - Load balancer management",
+    "AI - AI services information"
+  ],
+  "permissions": {
+    "ecs": "readonly",
+    "rds": "readonly",
+    "ack": "readonly",
+    "acr": "readonly",
+    "oss": "confirm",
+    "dns": "direct",
+    "slb": "direct",
+    "ai": "confirm"
+  }
+}
