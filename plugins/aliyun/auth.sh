@@ -34,22 +34,44 @@ load_from_project() {
     return 1
 }
 
+# 获取 aliyun CLI 配置文件路径
+get_cli_config_file() {
+    # 优先检查 acs-cfg.json (新版 aliyun CLI)
+    if [[ -f "$HOME/.aliyun/acs-cfg.json" ]]; then
+        echo "$HOME/.aliyun/acs-cfg.json"
+        return 0
+    fi
+    # 兼容旧版 config.json
+    if [[ -f "$HOME/.aliyun/config.json" ]]; then
+        echo "$HOME/.aliyun/config.json"
+        return 0
+    fi
+    return 1
+}
+
 # 从 aliyun CLI 配置加载
 load_from_cli_config() {
-    local profile="${1:-default}"
-    local config_file="$HOME/.aliyun/config.json"
+    local profile="${1:-}"
+    local config_file=$(get_cli_config_file)
 
-    if [[ -f "$config_file" ]]; then
-        local access_key_id=$(jq -r --arg p "$profile" '.profiles[] | select(.name == $p) | .access_key_id // empty' "$config_file" 2>/dev/null)
-        local access_key_secret=$(jq -r --arg p "$profile" '.profiles[] | select(.name == $p) | .access_key_secret // empty' "$config_file" 2>/dev/null)
-        local region_id=$(jq -r --arg p "$profile" '.profiles[] | select(.name == $p) | .region_id // empty' "$config_file" 2>/dev/null)
+    if [[ -z "$config_file" ]]; then
+        return 1
+    fi
 
-        if [[ -n "$access_key_id" && -n "$access_key_secret" ]]; then
-            export ALIBABA_CLOUD_ACCESS_KEY_ID="$access_key_id"
-            export ALIBABA_CLOUD_ACCESS_KEY_SECRET="$access_key_secret"
-            [[ -n "$region_id" ]] && export ALIBABA_CLOUD_REGION_ID="$region_id"
-            return 0
-        fi
+    # 如果没有指定 profile，使用 current 配置或 default
+    if [[ -z "$profile" ]]; then
+        profile=$(jq -r '.current // "default"' "$config_file" 2>/dev/null)
+    fi
+
+    local access_key_id=$(jq -r --arg p "$profile" '.profiles[] | select(.name == $p) | .access_key_id // empty' "$config_file" 2>/dev/null)
+    local access_key_secret=$(jq -r --arg p "$profile" '.profiles[] | select(.name == $p) | .access_key_secret // empty' "$config_file" 2>/dev/null)
+    local region_id=$(jq -r --arg p "$profile" '.profiles[] | select(.name == $p) | .region_id // empty' "$config_file" 2>/dev/null)
+
+    if [[ -n "$access_key_id" && -n "$access_key_secret" ]]; then
+        export ALIBABA_CLOUD_ACCESS_KEY_ID="$access_key_id"
+        export ALIBABA_CLOUD_ACCESS_KEY_SECRET="$access_key_secret"
+        [[ -n "$region_id" ]] && export ALIBABA_CLOUD_REGION_ID="$region_id"
+        return 0
     fi
     return 1
 }
@@ -64,11 +86,20 @@ load_from_env() {
 
 # 列出可用的 profiles
 list_profiles() {
-    local config_file="$HOME/.aliyun/config.json"
+    local config_file=$(get_cli_config_file)
 
-    if [[ -f "$config_file" ]]; then
+    if [[ -n "$config_file" ]]; then
         jq -r '.profiles[].name' "$config_file" 2>/dev/null
     fi
+}
+
+# 检查 aliyun CLI 是否已正确配置
+check_aliyun_cli_config() {
+    # 检查是否有 config.json
+    if [[ ! -f "$HOME/.aliyun/config.json" ]]; then
+        return 1
+    fi
+    return 0
 }
 
 # 验证凭证有效性
@@ -76,6 +107,13 @@ validate_credentials() {
     if [[ -z "$ALIBABA_CLOUD_ACCESS_KEY_ID" || -z "$ALIBABA_CLOUD_ACCESS_KEY_SECRET" ]]; then
         export CREDENTIAL_STATUS="missing"
         return 1
+    fi
+
+    # 检查 aliyun CLI 配置
+    if ! check_aliyun_cli_config; then
+        echo -e "${YELLOW}⚠️  aliyun CLI 未配置，请运行: aliyun configure${NC}" >&2
+        export CREDENTIAL_STATUS="cli_not_configured"
+        # 继续，因为凭证本身是有效的
     fi
 
     # 尝试调用 STS GetCallerIdentity 验证
@@ -87,6 +125,10 @@ validate_credentials() {
     elif echo "$result" | grep -q "InvalidAccessKeyId"; then
         export CREDENTIAL_STATUS="invalid"
         return 1
+    elif echo "$result" | grep -q "load configure failed"; then
+        # CLI 未配置，但凭证信息已加载
+        export CREDENTIAL_STATUS="cli_not_configured"
+        return 0
     else
         # 其他错误也视为有效（可能是权限问题但凭证本身有效）
         export CREDENTIAL_STATUS="authorized"
@@ -109,10 +151,10 @@ load_credentials() {
         fi
     fi
 
-    # 2. 使用指定的 profile 或 default
-    local profile="${specified_profile:-default}"
-    if load_from_cli_config "$profile"; then
-        export CREDENTIAL_SOURCE="cli:$profile"
+    # 2. 使用指定的 profile 或配置文件中的 current profile
+    if load_from_cli_config "$specified_profile"; then
+        local actual_profile="${specified_profile:-$(jq -r '.current // "default"' "$(get_cli_config_file)" 2>/dev/null)}"
+        export CREDENTIAL_SOURCE="cli:$actual_profile"
         validate_credentials
         return $?
     fi
@@ -142,9 +184,11 @@ show_credential_status() {
     fi
 
     # 检查 CLI 配置
-    if [[ -f "$HOME/.aliyun/config.json" ]]; then
+    local config_file=$(get_cli_config_file)
+    if [[ -n "$config_file" ]]; then
         local profiles=$(list_profiles | tr '\n' ', ' | sed 's/,$//')
-        echo -e "  CLI 配置: ${GREEN}发现${NC} (profiles: $profiles)"
+        local current=$(jq -r '.current // "default"' "$config_file" 2>/dev/null)
+        echo -e "  CLI 配置: ${GREEN}发现${NC} (当前: $current, 可用: $profiles)"
     else
         echo -e "  CLI 配置: ${YELLOW}未找到${NC}"
     fi

@@ -2,10 +2,13 @@
 # ai.sh - AI 服务操作
 # 使用方法: source ai.sh && ai_list
 
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-source "$SCRIPT_DIR/../auth.sh"
-source "$SCRIPT_DIR/../output.sh"
-source "$SCRIPT_DIR/../init.sh"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PLUGIN_DIR="${SCRIPT_DIR}/.."
+
+# 仅在未加载时加载依赖
+[[ -z "$ALIYUN_PLUGIN_DIR" ]] && source "$PLUGIN_DIR/auth.sh"
+[[ -z "$(type -t print_title)" ]] && source "$PLUGIN_DIR/output.sh"
+[[ -z "$(type -t load_config)" ]] && source "$PLUGIN_DIR/init.sh"
 
 # 列出 AI 服务状态
 ai_list() {

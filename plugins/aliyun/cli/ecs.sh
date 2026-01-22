@@ -2,10 +2,13 @@
 # ecs.sh - ECS 云服务器操作
 # 使用方法: source ecs.sh && ecs_list
 
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-source "$SCRIPT_DIR/../auth.sh"
-source "$SCRIPT_DIR/../output.sh"
-source "$SCRIPT_DIR/../init.sh"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PLUGIN_DIR="${SCRIPT_DIR}/.."
+
+# 仅在未加载时加载依赖
+[[ -z "$ALIYUN_PLUGIN_DIR" ]] && source "$PLUGIN_DIR/auth.sh"
+[[ -z "$(type -t print_title)" ]] && source "$PLUGIN_DIR/output.sh"
+[[ -z "$(type -t load_config)" ]] && source "$PLUGIN_DIR/init.sh"
 
 # 获取区域
 get_region() {
@@ -165,8 +168,16 @@ ecs_main() {
     load_config
     load_credentials "$ALIYUN_PROFILE"
 
-    if [[ "$CREDENTIAL_STATUS" != "authorized" ]]; then
+    if [[ "$CREDENTIAL_STATUS" == "missing" || "$CREDENTIAL_STATUS" == "invalid" ]]; then
         print_error "凭证无效或未配置，请运行 /aliyun config"
+        return 1
+    fi
+
+    if [[ "$CREDENTIAL_STATUS" == "cli_not_configured" ]]; then
+        print_warning "aliyun CLI 未配置，请先运行: aliyun configure"
+        print_info "配置时使用以下信息："
+        echo "  Access Key ID: $ALIBABA_CLOUD_ACCESS_KEY_ID"
+        echo "  Region: ${ALIBABA_CLOUD_REGION_ID:-cn-hangzhou}"
         return 1
     fi
 
